@@ -1,5 +1,6 @@
 let transactions = [];
 let myChart;
+let db;
 
 fetch("/api/transaction")
   .then(response => {
@@ -13,6 +14,64 @@ fetch("/api/transaction")
     populateTable();
     populateChart();
   });
+
+const request = indexedDB.open('pwafect_budget', 1);
+
+request.onupgradeneeded = function(event) {
+  const db = event.target.result;
+  db.createObjectStore('new_budget', { autoIncrement: true });
+};
+  
+request.onsuccess = function(event) {
+  db = event.target.result;
+  if (navigator.onLine) {
+    console.log("navigator online")
+    uploadBudget();
+  }
+};
+  
+request.onerror = function(event) {
+  console.log(event.target.errorCode);
+};
+
+function uploadBudget() {
+  const transaction = db.transaction(['new_budget'], 'readwrite');
+  const budgetObjectStore = transaction.objectStore('new_budget');
+  const getAll = budgetObjectStore.getAll();
+  getAll.onsuccess = function() {
+    if (getAll.result.length > 0) {
+      console.log('uploading transactions...')
+      fetch('/api/transaction', {
+        method: 'POST',
+        body: JSON.stringify(getAll.result),
+        headers: {
+          Accept: 'application/json, text/plain, */*',
+          'Content-Type': 'application/json'
+        } 
+      })
+      .then(response => response.json())
+      .then(serverResponse => {
+        if (serverResponse.message) {
+          throw new Error(serverResponse);
+        }
+        const transaction = db.transaction(['new_budget'], 'readwrite');
+        const budgetObjectStore = transaction.objectStore('new_budget');
+        budgetObjectStore.clear();
+  
+        alert('Your new transactions have been saved!')
+      })
+      .catch(err => {
+      console.log(err);
+      });
+    }
+  };
+};
+
+function saveRecord(record) {
+  const transaction = db.transaction(['new_budget'], 'readwrite');
+  const budgetObjectStore = transaction.objectStore('new_budget');
+  budgetObjectStore.add(record);
+}
 
 function populateTotal() {
   // reduce transaction amounts to a single total value
@@ -71,7 +130,7 @@ function populateChart() {
         datasets: [{
             label: "Total Over Time",
             fill: true,
-            backgroundColor: "#6666ff",
+            backgroundColor: "#B0E298",
             data
         }]
     }
@@ -151,3 +210,5 @@ document.querySelector("#add-btn").onclick = function() {
 document.querySelector("#sub-btn").onclick = function() {
   sendTransaction(false);
 };
+
+window.addEventListener('online', uploadBudget);
