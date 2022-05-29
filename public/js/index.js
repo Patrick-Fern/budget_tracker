@@ -15,7 +15,7 @@ fetch("/api/transaction")
     populateChart();
   });
 
-const request = indexedDB.open('pwafect_budget', 1);
+const request = indexedDB.open('budget_tracker', 1);
 
 request.onupgradeneeded = function(event) {
   const db = event.target.result;
